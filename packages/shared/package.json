@@ -1,0 +1,13 @@
+{
+  "name": "@market/shared",
+  "private": true,
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "echo \"shared package build ready\"",
+    "lint": "echo \"lint pending setup\"",
+    "test": "echo \"no tests yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

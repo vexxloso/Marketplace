@@ -1,0 +1,20 @@
+{
+  "name": "marketplace-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Marketplace monorepo skeleton",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "admin:promote": "pnpm --filter @market/api admin:promote",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  }
+}

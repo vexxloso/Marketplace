@@ -1,0 +1,10 @@
+pnpm --filter @market/api dev
+pnpm --filter @market/web dev
+taskkill /PID 21024 /F
+
+pg_ctl start -D "C:\Program Files\PostgreSQL\18\data"
+pg_ctl status -D "C:\Program Files\PostgreSQL\16\data"
+psql -U postgres
+
+pnpm --filter @market/api prisma:generate
+pnpm admin:promote
