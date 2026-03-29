@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { API_BASE } from "../../lib/api";
@@ -28,7 +28,7 @@ function formatAuthFailureMessage(data: {
   return `${base} — ${parts.join("; ")}`;
 }
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
   const params = useSearchParams();
   const [mode, setMode] = useState<AuthMode>(params.get("mode") === "register" ? "register" : "login");
@@ -236,5 +236,21 @@ export default function AuthPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="container auth-page auth-luxury-page">
+          <p className="dashboard-comment" style={{ padding: "48px 0", textAlign: "center" }}>
+            Loading…
+          </p>
+        </main>
+      }
+    >
+      <AuthPageContent />
+    </Suspense>
   );
 }
