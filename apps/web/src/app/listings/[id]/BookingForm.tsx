@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { API_BASE } from "../../../lib/api";
-import { getStoredToken } from "../../../lib/auth";
+import { getStoredToken, subscribeAuthChanged } from "../../../lib/auth";
 
 type Props = {
   listingId: string;
@@ -48,6 +49,7 @@ export default function BookingForm({
   minimumStayNights,
   instantBook,
 }: Props) {
+  const router = useRouter();
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [token, setToken] = useState("");
@@ -64,6 +66,9 @@ export default function BookingForm({
 
   useEffect(() => {
     setToken(getStoredToken());
+    return subscribeAuthChanged(() => {
+      setToken(getStoredToken());
+    });
   }, []);
 
   const nights = checkIn && checkOut ? daysBetween(checkIn, checkOut) : 0;
@@ -137,8 +142,8 @@ export default function BookingForm({
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
     if (!token.trim()) {
-      setMessage("Paste your JWT token to book");
-      setStatus("error");
+      const returnUrl = `/listings/${listingId}`;
+      router.push(`/auth?mode=login&returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -278,21 +283,13 @@ export default function BookingForm({
 
       <form onSubmit={handleBook}>
         <p className="dashboard-meta" style={{ marginTop: 8 }}>
-          Sign in first if you have not joined yet. <Link href="/auth">Open account access</Link>.
+          <Link
+            href={`/auth?mode=login&returnUrl=${encodeURIComponent(`/listings/${listingId}`)}`}
+          >
+            Sign in
+          </Link>{" "}
+          to complete your reservation.
         </p>
-
-        <details className="booking-token-toggle">
-          <summary>Manual token override</summary>
-          <label className="booking-field" style={{ marginTop: 12 }}>
-            <span>JWT Token</span>
-            <input
-              type="text"
-              placeholder="Saved automatically from /auth"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
-          </label>
-        </details>
 
         <button
           type="submit"

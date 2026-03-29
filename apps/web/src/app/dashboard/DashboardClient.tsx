@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { API_BASE, apiAssetUrl } from "../../lib/api";
-import { clearStoredTokens, getStoredToken, storeToken } from "../../lib/auth";
+import { API_BASE } from "../../lib/api";
+import { getStoredToken, signOut, storeToken } from "../../lib/auth";
+import Reveal from "../Reveal";
 import MessageInbox from "./MessageInbox";
 import NotificationPanel from "./NotificationPanel";
 import PayBookingButton from "./PayBookingButton";
@@ -14,7 +16,7 @@ type MeResponse = {
     email: string;
     id: string;
     name: string | null;
-    role: "guest" | "host" | "admin";
+    role: "user" | "admin";
   };
 };
 
@@ -36,37 +38,6 @@ type MyBooking = {
   };
 };
 
-type IncomingBooking = {
-  id: string;
-  checkIn: string;
-  checkOut: string;
-  createdAt: string;
-  payment?: {
-    id: string;
-    status: "PENDING" | "PAID" | "FAILED" | "CANCELLED";
-  } | null;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
-  totalPrice: string;
-  guest: {
-    email: string;
-    id: string;
-    name: string | null;
-  };
-  listing: {
-    id: string;
-    title: string;
-  };
-};
-
-type ListingSummary = {
-  coverImageUrl?: string | null;
-  createdAt: string;
-  id: string;
-  pricePerDay: string;
-  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-  title: string;
-};
-
 type ReviewSummary = {
   comment: string | null;
   createdAt: string;
@@ -82,21 +53,6 @@ function authHeaders(token: string) {
   return {
     Authorization: `Bearer ${token.trim()}`,
   };
-}
-
-function DashboardStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <div className="dashboard-stat">
-      <span className="dashboard-stat-value">{value}</span>
-      <span className="dashboard-stat-label">{label}</span>
-    </div>
-  );
 }
 
 function WindowsLoader({ label }: { label?: string }) {
@@ -137,19 +93,57 @@ function statusClass(status: string) {
   return "badge badge-archived";
 }
 
+function compactBookingId(id: string) {
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+}
+
+function paymentTagClass(paymentStatus: string | undefined) {
+  const s = paymentStatus ?? "UNPAID";
+  if (s === "PAID") return "dashboard-booking-tag dashboard-booking-tag--pay dashboard-booking-tag--pay-paid";
+  if (s === "PENDING") return "dashboard-booking-tag dashboard-booking-tag--pay dashboard-booking-tag--pay-pending";
+  if (s === "FAILED") return "dashboard-booking-tag dashboard-booking-tag--pay dashboard-booking-tag--pay-failed";
+  return "dashboard-booking-tag dashboard-booking-tag--pay dashboard-booking-tag--pay-unpaid";
+}
+
+const DASH_TAB_QUERY = "tab";
+
+type DashboardView = "overview" | "bookings" | "reviews" | "messages";
+
+type DashboardNavTab = Exclude<DashboardView, "overview">;
+
+const VIEW_TO_SLUG: Record<DashboardNavTab, string> = {
+  bookings: "trips",
+  reviews: "reviews",
+  messages: "messages",
+};
+
+const SLUG_TO_VIEW: Record<string, DashboardNavTab> = {
+  trips: "bookings",
+  reviews: "reviews",
+  messages: "messages",
+};
+
+function resolveViewFromSearchParams(tabSlug: string | null): DashboardView {
+  if (!tabSlug || tabSlug.trim() === "") return "overview";
+  return SLUG_TO_VIEW[tabSlug] ?? "overview";
+}
+
 export default function DashboardClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabSlug = searchParams.get(DASH_TAB_QUERY);
+
   const [token, setToken] = useState("");
   const [user, setUser] = useState<MeResponse["user"] | null>(null);
   const [guestBookings, setGuestBookings] = useState<MyBooking[]>([]);
-  const [hostBookings, setHostBookings] = useState<IncomingBooking[]>([]);
-  const [myListings, setMyListings] = useState<ListingSummary[]>([]);
   const [myReviews, setMyReviews] = useState<ReviewSummary[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [message, setMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "bookings" | "listings" | "incoming" | "reviews" | "messages"
-  >("overview");
+  const [copiedBookingId, setCopiedBookingId] = useState<string | null>(null);
+
+  const activeView = useMemo(() => resolveViewFromSearchParams(tabSlug), [tabSlug]);
 
   useEffect(() => {
     const saved = getStoredToken();
@@ -159,40 +153,39 @@ export default function DashboardClient() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    if (tabSlug == null || tabSlug === "") return;
+    if (!SLUG_TO_VIEW[tabSlug]) {
+      router.replace("/dashboard", { scroll: false });
+    }
+  }, [user, tabSlug, router]);
+
   const stats = useMemo(() => {
     return {
       guestBookings: guestBookings.length,
-      hostBookings: hostBookings.length,
-      listings: myListings.length,
       reviews: myReviews.length,
     };
-  }, [guestBookings.length, hostBookings.length, myListings.length, myReviews.length]);
+  }, [guestBookings.length, myReviews.length]);
 
   const dashboardTabs = useMemo(() => {
-    const tabs: Array<{
-      id: "overview" | "bookings" | "listings" | "incoming" | "reviews" | "messages";
-      label: string;
-      count?: number;
-    }> = [
-      { id: "overview", label: "Overview" },
-      { id: "bookings", label: "Trips", count: stats.guestBookings },
-      { id: "reviews", label: "Reviews", count: stats.reviews },
-      { id: "messages", label: "Messages" },
+    return [
+      { id: "bookings" as const, label: "Trips", count: stats.guestBookings },
+      { id: "reviews" as const, label: "Reviews", count: stats.reviews },
+      { id: "messages" as const, label: "Messages" },
     ];
+  }, [stats.guestBookings, stats.reviews]);
 
-    if (user?.role === "host" || user?.role === "admin") {
-      tabs.splice(2, 0, { id: "listings", label: "Listings", count: stats.listings });
-      tabs.splice(3, 0, { id: "incoming", label: "Incoming", count: stats.hostBookings });
+  function navigateToView(next: DashboardView) {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "overview") {
+      sp.delete(DASH_TAB_QUERY);
+    } else {
+      sp.set(DASH_TAB_QUERY, VIEW_TO_SLUG[next]);
     }
-
-    return tabs;
-  }, [stats.guestBookings, stats.hostBookings, stats.listings, stats.reviews, user?.role]);
-
-  useEffect(() => {
-    if (!dashboardTabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab("overview");
-    }
-  }, [activeTab, dashboardTabs]);
+    const qs = sp.toString();
+    router.replace(qs ? `/dashboard?${qs}` : "/dashboard", { scroll: false });
+  }
 
   async function loadDashboard(currentToken: string) {
     setStatus("loading");
@@ -214,33 +207,18 @@ export default function DashboardClient() {
       const currentUser = (meData as MeResponse).user;
       setUser(currentUser);
 
-      const requests: Promise<Response>[] = [
+      const responses = await Promise.all([
         fetch(`${API_BASE}/my/bookings`, {
           headers: authHeaders(currentToken),
         }),
         fetch(`${API_BASE}/my/reviews`, {
           headers: authHeaders(currentToken),
         }),
-      ];
-
-      if (currentUser.role === "host" || currentUser.role === "admin") {
-        requests.push(
-          fetch(`${API_BASE}/my/listings`, {
-            headers: authHeaders(currentToken),
-          }),
-          fetch(`${API_BASE}/my/listings/bookings`, {
-            headers: authHeaders(currentToken),
-          }),
-        );
-      }
-
-      const responses = await Promise.all(requests);
+      ]);
       const payloads = await Promise.all(responses.map((response) => response.json()));
 
       setGuestBookings(payloads[0].bookings ?? []);
       setMyReviews(payloads[1].reviews ?? []);
-      setMyListings(payloads[2]?.listings ?? []);
-      setHostBookings(payloads[3]?.bookings ?? []);
 
       storeToken(currentToken, currentUser.role);
       setStatus("ready");
@@ -250,10 +228,36 @@ export default function DashboardClient() {
     }
   }
 
-  async function runBookingAction(
-    bookingId: string,
-    action: "confirm" | "cancel",
-  ) {
+  async function copyBookingIdToClipboard(id: string) {
+    const resetTimer = () =>
+      window.setTimeout(() => {
+        setCopiedBookingId((cur) => (cur === id ? null : cur));
+      }, 2000);
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedBookingId(id);
+      resetTimer();
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = id;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopiedBookingId(id);
+        resetTimer();
+      } catch {
+        setActionMessage("Could not copy booking ID");
+        window.setTimeout(() => setActionMessage(""), 2500);
+      }
+    }
+  }
+
+  async function runBookingAction(bookingId: string, action: "cancel") {
     if (!token.trim()) {
       setActionMessage("Token missing");
       return;
@@ -273,26 +277,24 @@ export default function DashboardClient() {
         return;
       }
 
-      setActionMessage(
-        action === "confirm" ? "Booking confirmed" : "Booking cancelled",
-      );
+      setActionMessage("Booking cancelled");
       await loadDashboard(token);
     } catch {
       setActionMessage("Network error");
     }
   }
 
-  function handleClearToken() {
-    clearStoredTokens();
+  function handleSignOut() {
+    signOut();
     setToken("");
     setUser(null);
     setGuestBookings([]);
-    setHostBookings([]);
-    setMyListings([]);
     setMyReviews([]);
     setStatus("idle");
     setMessage("");
     setActionMessage("");
+    router.push("/");
+    router.refresh();
   }
 
   function renderGuestBookings() {
@@ -301,138 +303,78 @@ export default function DashboardClient() {
     }
 
     return (
-      <div className="dashboard-grid">
-        {guestBookings.map((booking) => (
-          <div key={booking.id} className="dashboard-card">
-            <div className="dashboard-card-top">
-              <Link href={`/listings/${booking.listing.id}`}>
-                {booking.listing.title}
-              </Link>
-              <span className={statusClass(booking.status)}>
-                {booking.status}
-              </span>
-            </div>
-            <p className="dashboard-meta">Booking ID: {booking.id}</p>
-            <p className="dashboard-meta">
-              {new Date(booking.checkIn).toLocaleDateString()} to{" "}
-              {new Date(booking.checkOut).toLocaleDateString()}
-            </p>
-            <p className="dashboard-meta">
-              Payment: {booking.payment?.status ?? "UNPAID"}
-            </p>
-            <p className="dashboard-price">${booking.totalPrice} total</p>
-            {booking.payment?.status !== "PAID" &&
-            booking.status !== "CANCELLED" ? (
-              <PayBookingButton bookingId={booking.id} token={token} />
-            ) : null}
-            {booking.status !== "CANCELLED" ? (
-              <button
-                type="button"
-                className="dashboard-danger-btn"
-                onClick={() => runBookingAction(booking.id, "cancel")}
-              >
-                Cancel booking
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function renderListings() {
-    if (myListings.length === 0) {
-      return <div className="empty dashboard-empty">No listings yet.</div>;
-    }
-
-    return (
-      <div className="dashboard-grid">
-        {myListings.map((listing) => (
-          <Link
-            key={listing.id}
-            href={`/listings/${listing.id}`}
-            className="dashboard-listing-card"
-          >
-            {listing.coverImageUrl ? (
-              <img
-                src={apiAssetUrl(listing.coverImageUrl) ?? ""}
-                alt={listing.title}
-                className="dashboard-listing-image"
-              />
-            ) : (
-              <div className="dashboard-listing-placeholder">
-                Curated image coming soon
-              </div>
-            )}
-            <div className="dashboard-listing-body">
-              <div className="dashboard-card-top">
-                <strong>{listing.title}</strong>
-                <span className={statusClass(listing.status)}>
-                  {listing.status}
+      <div className="dashboard-list">
+        {guestBookings.map((booking, index) => {
+          const payStatus = booking.payment?.status ?? "UNPAID";
+          const dateLabel = `${new Date(booking.checkIn).toLocaleDateString()} – ${new Date(booking.checkOut).toLocaleDateString()}`;
+          const idCopied = copiedBookingId === booking.id;
+          return (
+            <div key={booking.id} className="dashboard-list-row">
+              <div className="dashboard-booking-line">
+                <span className="dashboard-booking-no" aria-label={`Booking ${index + 1}`}>
+                  {index + 1}
                 </span>
+                <Link
+                  className="dashboard-booking-title"
+                  href={`/listings/${booking.listing.id}`}
+                  title={booking.listing.title}
+                >
+                  {booking.listing.title}
+                </Link>
+                <button
+                  type="button"
+                  className="dashboard-booking-tag dashboard-booking-tag--id dashboard-booking-id-copy"
+                  title={`Copy full ID: ${booking.id}`}
+                  aria-label={
+                    idCopied
+                      ? "Booking ID copied"
+                      : `Copy booking ID ${booking.id}`
+                  }
+                  onClick={() => void copyBookingIdToClipboard(booking.id)}
+                >
+                  {idCopied ? "Copied" : `ID ${compactBookingId(booking.id)}`}
+                </button>
+                <span
+                  className="dashboard-booking-tag dashboard-booking-tag--dates"
+                  title={`${booking.checkIn} → ${booking.checkOut}`}
+                >
+                  {dateLabel}
+                </span>
+                <span className={paymentTagClass(booking.payment?.status)} title="Payment status">
+                  {payStatus}
+                </span>
+                <span
+                  className="dashboard-booking-tag dashboard-booking-tag--total"
+                  title="Total for this stay"
+                >
+                  ${booking.totalPrice} total
+                </span>
+                <span className={statusClass(booking.status)} title="Booking status">
+                  {booking.status}
+                </span>
+                <div className="dashboard-booking-line-actions">
+                  {booking.payment?.status !== "PAID" &&
+                  booking.status !== "CANCELLED" ? (
+                    <PayBookingButton
+                      bookingId={booking.id}
+                      token={token}
+                      layout="bookingRow"
+                    />
+                  ) : null}
+                  {booking.status !== "CANCELLED" ? (
+                    <button
+                      type="button"
+                      className="dashboard-danger-btn dashboard-booking-cancel-btn"
+                      onClick={() => runBookingAction(booking.id, "cancel")}
+                    >
+                      Cancel booking
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <p className="dashboard-price">${listing.pricePerDay}/night</p>
-              <p className="dashboard-meta">
-                Created {new Date(listing.createdAt).toLocaleDateString()}
-              </p>
             </div>
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  function renderIncomingBookings() {
-    if (hostBookings.length === 0) {
-      return <div className="empty dashboard-empty">No incoming bookings yet.</div>;
-    }
-
-    return (
-      <div className="dashboard-grid">
-        {hostBookings.map((booking) => (
-          <div key={booking.id} className="dashboard-card">
-            <div className="dashboard-card-top">
-              <Link href={`/listings/${booking.listing.id}`}>
-                {booking.listing.title}
-              </Link>
-              <span className={statusClass(booking.status)}>
-                {booking.status}
-              </span>
-            </div>
-            <p className="dashboard-meta">
-              Guest: {booking.guest.name ?? booking.guest.email}
-            </p>
-            <p className="dashboard-meta">
-              {new Date(booking.checkIn).toLocaleDateString()} to{" "}
-              {new Date(booking.checkOut).toLocaleDateString()}
-            </p>
-            <p className="dashboard-meta">
-              Payment: {booking.payment?.status ?? "UNPAID"}
-            </p>
-            <p className="dashboard-price">${booking.totalPrice} total</p>
-
-            <div className="dashboard-card-actions">
-              {booking.status === "PENDING" ? (
-                <button
-                  type="button"
-                  className="dashboard-primary-btn"
-                  onClick={() => runBookingAction(booking.id, "confirm")}
-                >
-                  Confirm
-                </button>
-              ) : null}
-              {booking.status !== "CANCELLED" ? (
-                <button
-                  type="button"
-                  className="dashboard-danger-btn"
-                  onClick={() => runBookingAction(booking.id, "cancel")}
-                >
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -443,10 +385,10 @@ export default function DashboardClient() {
     }
 
     return (
-      <div className="dashboard-grid">
+      <div className="dashboard-list">
         {myReviews.map((review) => (
-          <div key={review.id} className="dashboard-card">
-            <div className="dashboard-card-top">
+          <div key={review.id} className="dashboard-list-row">
+            <div className="dashboard-list-row-head">
               <Link href={`/listings/${review.listing.id}`}>
                 {review.listing.title}
               </Link>
@@ -467,120 +409,90 @@ export default function DashboardClient() {
   }
 
   function renderTabContent() {
-    switch (activeTab) {
+    switch (activeView) {
       case "overview":
         return (
           <div className="dashboard-tab-stack">
-            <NotificationPanel enabled={status === "ready"} token={token} />
-            <section className="dashboard-section">
-              <div className="dashboard-section-header">
-                <h2>Quick view</h2>
-                {actionMessage ? (
-                  <span className="dashboard-section-note">{actionMessage}</span>
-                ) : null}
-              </div>
-              <div className="dashboard-grid dashboard-overview-grid">
-                <div className="dashboard-card dashboard-overview-card">
-                  <p className="eyebrow">Trips</p>
-                  <h3>Your upcoming stays</h3>
-                  <p className="dashboard-comment">
-                    Track reservations, payment state, and trip timing in one place.
-                  </p>
-                  <button
-                    type="button"
-                    className="dashboard-tab-ghost"
-                    onClick={() => setActiveTab("bookings")}
-                  >
-                    Open trips
-                  </button>
+            <Reveal>
+              <NotificationPanel enabled={status === "ready"} token={token} />
+            </Reveal>
+            <Reveal>
+              <section className="dashboard-section">
+                <div className="dashboard-section-header">
+                  <h2>Quick view</h2>
+                  {actionMessage ? (
+                    <span className="dashboard-section-note">{actionMessage}</span>
+                  ) : null}
                 </div>
-                {(user?.role === "host" || user?.role === "admin") && (
-                  <div className="dashboard-card dashboard-overview-card">
-                    <p className="eyebrow">Hosting</p>
-                    <h3>Listings and incoming requests</h3>
+                <div className="dashboard-quick-strip">
+                  <div className="dashboard-quick-block">
+                    <p className="eyebrow">Trips</p>
+                    <h3 className="dashboard-quick-heading">Your upcoming stays</h3>
                     <p className="dashboard-comment">
-                      Review listings, new booking interest, and operational activity.
+                      Track reservations, payment state, and trip timing in one place.
                     </p>
-                    <div className="dashboard-inline-actions">
-                      <button
-                        type="button"
-                        className="dashboard-tab-ghost"
-                        onClick={() => setActiveTab("listings")}
-                      >
-                        View listings
-                      </button>
-                      <button
-                        type="button"
-                        className="dashboard-tab-ghost"
-                        onClick={() => setActiveTab("incoming")}
-                      >
-                        Incoming bookings
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="dashboard-tab-ghost"
+                      onClick={() => navigateToView("bookings")}
+                    >
+                      Open trips
+                    </button>
                   </div>
-                )}
-                <div className="dashboard-card dashboard-overview-card">
-                  <p className="eyebrow">Conversations</p>
-                  <h3>Stay close to guests and hosts</h3>
-                  <p className="dashboard-comment">
-                    Open live threads, follow updates, and keep booking communication moving.
-                  </p>
-                  <button
-                    type="button"
-                    className="dashboard-tab-ghost"
-                    onClick={() => setActiveTab("messages")}
-                  >
-                    Open messages
-                  </button>
+                  {user?.role === "admin" ? (
+                    <div className="dashboard-quick-block">
+                      <p className="eyebrow">Operations</p>
+                      <h3 className="dashboard-quick-heading">Listings and bookings</h3>
+                      <p className="dashboard-comment">
+                        Manage catalog, moderation, and reservations in the admin workspace.
+                      </p>
+                      <Link href="/admin" className="hero-inline-link">
+                        Open admin panel
+                      </Link>
+                    </div>
+                  ) : null}
+                  <div className="dashboard-quick-block">
+                    <p className="eyebrow">Conversations</p>
+                    <h3 className="dashboard-quick-heading">Messages about your trips</h3>
+                    <p className="dashboard-comment">
+                      Open live threads, follow updates, and keep booking communication moving.
+                    </p>
+                    <button
+                      type="button"
+                      className="dashboard-tab-ghost"
+                      onClick={() => navigateToView("messages")}
+                    >
+                      Open messages
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </Reveal>
           </div>
         );
       case "bookings":
         return (
-          <section className="dashboard-section">
-            <div className="dashboard-section-header">
-              <h2>My bookings</h2>
-              <span className="dashboard-section-note">
-                Use booking IDs here when writing reviews.
-              </span>
-            </div>
-            {renderGuestBookings()}
-          </section>
-        );
-      case "listings":
-        return (
-          <section className="dashboard-section">
-            <div className="dashboard-section-header">
-              <h2>My listings</h2>
-            </div>
-            {renderListings()}
-          </section>
-        );
-      case "incoming":
-        return (
-          <section className="dashboard-section">
-            <div className="dashboard-section-header">
-              <h2>Incoming bookings</h2>
-              {actionMessage ? (
-                <span className="dashboard-section-note">{actionMessage}</span>
-              ) : null}
-            </div>
-            {renderIncomingBookings()}
-          </section>
+          <Reveal>
+            <section className="dashboard-section">{renderGuestBookings()}</section>
+          </Reveal>
         );
       case "reviews":
         return (
-          <section className="dashboard-section">
-            <div className="dashboard-section-header">
-              <h2>My reviews</h2>
-            </div>
-            {renderReviews()}
-          </section>
+          <Reveal>
+            <section className="dashboard-section">
+              <div className="dashboard-section-header">
+                <h2>My reviews</h2>
+              </div>
+              {renderReviews()}
+            </section>
+          </Reveal>
         );
       case "messages":
-        return <MessageInbox enabled={status === "ready"} token={token} />;
+        return (
+          <Reveal>
+            <MessageInbox enabled={status === "ready"} token={token} />
+          </Reveal>
+        );
       default:
         return null;
     }
@@ -588,101 +500,22 @@ export default function DashboardClient() {
 
   return (
     <main className="container dashboard-page">
-      <section className="dashboard-hero">
-        <div>
-          <p className="eyebrow">Account hub</p>
-          <p className="subtitle">
-            Manage your stays, hosting activity, reviews, and conversations from one premium control center.
-          </p>
-        </div>
-
-        {user ? (
-          <div className="dashboard-hero-actions">
-            <button
-              type="button"
-              className="clear-btn"
-              onClick={() => void loadDashboard(token)}
-              disabled={status === "loading"}
-            >
-              {status === "loading" ? (
-                <span className="dashboard-button-loading">
-                  <WindowsLoader />
-                  Refreshing...
-                </span>
-              ) : (
-                "Refresh account"
-              )}
-            </button>
-            <button
-              type="button"
-              className="clear-btn"
-              onClick={handleClearToken}
-            >
-              Sign out
-            </button>
+      <Reveal>
+        <section className="dashboard-hero">
+          <div className="dashboard-hero-copy">
+            <p className="eyebrow">Account hub</p>
+            <p className="subtitle">
+              Manage your stays, reviews, and trip messages from one place. Admins use the admin panel for listings and operations.
+            </p>
           </div>
-        ) : null}
-      </section>
-
-      {!token.trim() ? (
-        <section className="dashboard-auth-card dashboard-empty-shell">
-          <p className="eyebrow">Secure access</p>
-          <h2>Sign in to open your dashboard.</h2>
-          <p className="dashboard-comment">
-            Your account area loads automatically once you sign in. This page no longer asks customers to manage raw tokens.
-          </p>
-          <div className="dashboard-inline-actions">
-            <Link href="/auth" className="hero-primary">
-              Sign in
-            </Link>
-            <Link href="/listings" className="hero-secondary">
-              Browse stays
-            </Link>
-          </div>
-        </section>
-      ) : status === "loading" && !user ? (
-        <section className="dashboard-auth-card dashboard-empty-shell">
-          <p className="eyebrow">Loading account</p>
-          <div className="dashboard-loading-panel">
-            <WindowsLoader label="Preparing your dashboard..." />
-          </div>
-          <p className="dashboard-comment">
-            We are loading your profile, reservations, and activity.
-          </p>
-        </section>
-      ) : user ? (
-        <>
-          <section className="dashboard-section">
-            <div className="dashboard-account-card dashboard-account-shell">
-              <div>
-                <p className="eyebrow">Welcome back</p>
-                <h2>{user.name ?? "Account"}</h2>
-                <p className="dashboard-account-meta">{user.email}</p>
-              </div>
-              <div className="dashboard-account-side">
-                <span className={statusClass(user.role.toUpperCase())}>{user.role}</span>
-                <p className="dashboard-section-note">Everything updates automatically from your saved session.</p>
-              </div>
-            </div>
-
-            <div className="dashboard-stats">
-              <DashboardStat label="My bookings" value={stats.guestBookings} />
-              <DashboardStat label="My reviews" value={stats.reviews} />
-              {(user.role === "host" || user.role === "admin") && (
-                <>
-                  <DashboardStat label="My listings" value={stats.listings} />
-                  <DashboardStat label="Incoming bookings" value={stats.hostBookings} />
-                </>
-              )}
-            </div>
-
-            <div className="dashboard-tab-bar">
+          {user ? (
+            <nav className="dashboard-tab-bar dashboard-tab-bar--header" aria-label="Account sections">
               {dashboardTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
-                  className={tab.id === activeTab ? "dashboard-tab active" : "dashboard-tab"}
-                  onClick={() => setActiveTab(tab.id)}
+                  className={tab.id === activeView ? "dashboard-tab active" : "dashboard-tab"}
+                  onClick={() => navigateToView(tab.id)}
                 >
                   <span>{tab.label}</span>
                   {tab.count != null ? (
@@ -690,25 +523,59 @@ export default function DashboardClient() {
                   ) : null}
                 </button>
               ))}
+            </nav>
+          ) : null}
+        </section>
+      </Reveal>
+
+      {!token.trim() ? (
+        <Reveal>
+          <section className="dashboard-auth-card dashboard-empty-shell">
+            <p className="eyebrow">Secure access</p>
+            <h2>Sign in to open your dashboard.</h2>
+            <p className="dashboard-comment">
+              Your account area loads automatically once you sign in. This page no longer asks customers to manage raw tokens.
+            </p>
+            <div className="dashboard-inline-actions">
+              <Link href="/auth" className="hero-primary">
+                Sign in
+              </Link>
+              <Link href="/listings" className="hero-secondary">
+                Browse stays
+              </Link>
             </div>
           </section>
-
-          {renderTabContent()}
-        </>
+        </Reveal>
+      ) : status === "loading" && !user ? (
+        <Reveal>
+          <section className="dashboard-auth-card dashboard-empty-shell">
+            <p className="eyebrow">Loading account</p>
+            <div className="dashboard-loading-panel">
+              <WindowsLoader label="Preparing your dashboard..." />
+            </div>
+            <p className="dashboard-comment">
+              We are loading your profile, reservations, and activity.
+            </p>
+          </section>
+        </Reveal>
+      ) : user ? (
+        <>{renderTabContent()}</>
       ) : (
-        <section className="dashboard-auth-card dashboard-empty-shell">
-          <p className="eyebrow">Access issue</p>
-          <h2>We could not open your dashboard.</h2>
-          <p className="dashboard-comment">{message || "Please sign in again to continue."}</p>
-          <div className="dashboard-inline-actions">
-            <Link href="/auth" className="hero-primary">
-              Sign in again
-            </Link>
-            <button type="button" className="clear-btn" onClick={handleClearToken}>
-              Clear session
-            </button>
-          </div>
-        </section>
+        <Reveal>
+          <section className="dashboard-auth-card dashboard-empty-shell">
+            <p className="eyebrow">Access issue</p>
+            <h2>We could not open your dashboard.</h2>
+            <p className="dashboard-comment">{message || "Please sign in again to continue."}</p>
+            <div className="dashboard-inline-actions">
+              <Link href="/auth" className="hero-primary">
+                Sign in again
+              </Link>
+              <button type="button" className="clear-btn" onClick={handleSignOut}>
+                Sign out
+              </button>
+            </div>
+          </section>
+        </Reveal>
       )}
     </main>
   );

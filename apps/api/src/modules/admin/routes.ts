@@ -5,7 +5,7 @@ import { requireRoles, toAppRole, toDbRole } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 
 const updateUserRoleSchema = z.object({
-  role: z.enum(["guest", "host", "admin"]),
+  role: z.enum(["user", "admin"]),
 });
 
 const updateUserModerationSchema = z.object({
@@ -66,10 +66,22 @@ function toNumber(value: number | string | null | undefined) {
   return Number(value ?? 0);
 }
 
+function parseAdminPagedQuery(query: { limit?: string; page?: string }) {
+  const page = Math.max(1, parseInt(String(query.page ?? "1"), 10) || 1);
+  const rawLimit = parseInt(String(query.limit ?? "12"), 10);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 12));
+  const skip = (page - 1) * limit;
+  return { limit, page, skip };
+}
+
 function serializeUser(user: any) {
+  const role = toAppRole(user.role);
   return {
     ...user,
-    role: toAppRole(user.role),
+    isBanned: role === "admin" ? false : Boolean(user.isBanned),
+    isSuspended: role === "admin" ? false : Boolean(user.isSuspended),
+    isVerified: role === "admin" ? true : Boolean(user.isVerified),
+    role,
   };
 }
 
@@ -297,22 +309,41 @@ export async function adminRoutes(server: FastifyInstance) {
     const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
-    const users = await db.user.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        createdAt: true,
-        email: true,
-        id: true,
-        isBanned: true,
-        isSuspended: true,
-        isVerified: true,
-        name: true,
-        role: true,
-      },
-    });
+    const query = request.query as { page?: string; limit?: string };
+    const page = Math.max(1, parseInt(String(query.page ?? "1"), 10) || 1);
+    const rawLimit = parseInt(String(query.limit ?? "12"), 10);
+    const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 12));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      db.user.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          createdAt: true,
+          email: true,
+          id: true,
+          isBanned: true,
+          isSuspended: true,
+          isVerified: true,
+          name: true,
+          role: true,
+        },
+      }),
+      db.user.count(),
+    ]);
+
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
 
     return reply.send({
       users: users.map((user) => serializeUser(user)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     });
   });
 
@@ -342,6 +373,9 @@ export async function adminRoutes(server: FastifyInstance) {
     const user = await db.user.update({
       where: { id },
       data: {
+        isBanned: parsed.data.role === "admin" ? false : undefined,
+        isSuspended: parsed.data.role === "admin" ? false : undefined,
+        isVerified: parsed.data.role === "admin" ? true : undefined,
         role: toDbRole(parsed.data.role),
       },
       select: {
@@ -366,7 +400,7 @@ export async function adminRoutes(server: FastifyInstance) {
     if (!auth) return;
 
     const { id } = request.params as { id: string };
-    const parsed = updateUserModerationSchema.safeParse(request.body);
+    const parsed = updateUserModerationSchema.safeParse(request.body ?? {});
 
     if (!parsed.success) {
       return reply.code(400).send({
@@ -375,61 +409,130 @@ export async function adminRoutes(server: FastifyInstance) {
       });
     }
 
-    const existing = await db.user.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    const patch = parsed.data;
+    const data: {
+      isBanned?: boolean;
+      isSuspended?: boolean;
+      isVerified?: boolean;
+    } = {};
+    if (typeof patch.isBanned === "boolean") data.isBanned = patch.isBanned;
+    if (typeof patch.isSuspended === "boolean") data.isSuspended = patch.isSuspended;
+    if (typeof patch.isVerified === "boolean") data.isVerified = patch.isVerified;
 
-    if (!existing) {
-      return reply.code(404).send({ message: "User not found" });
+    if (Object.keys(data).length === 0) {
+      return reply.code(400).send({
+        message: "Provide at least one of isVerified, isSuspended, or isBanned",
+      });
     }
 
-    const user = await db.user.update({
-      where: { id },
-      data: parsed.data,
-      select: {
-        createdAt: true,
-        email: true,
-        id: true,
-        isBanned: true,
-        isSuspended: true,
-        isVerified: true,
-        name: true,
-        role: true,
-      },
-    });
+    try {
+      const existing = await db.user.findUnique({
+        where: { id },
+        select: { id: true, role: true },
+      });
 
-    return reply.send({
-      user: serializeUser(user),
-    });
+      if (!existing) {
+        return reply.code(404).send({ message: "User not found" });
+      }
+
+      if (existing.role === "ADMIN") {
+        const adminUser = await db.user.findUnique({
+          where: { id },
+          select: {
+            createdAt: true,
+            email: true,
+            id: true,
+            isBanned: true,
+            isSuspended: true,
+            isVerified: true,
+            name: true,
+            role: true,
+          },
+        });
+
+        return reply.send({
+          user: serializeUser(adminUser),
+        });
+      }
+
+      const user = await db.user.update({
+        where: { id },
+        data,
+        select: {
+          createdAt: true,
+          email: true,
+          id: true,
+          isBanned: true,
+          isSuspended: true,
+          isVerified: true,
+          name: true,
+          role: true,
+        },
+      });
+
+      return reply.send({
+        user: serializeUser(user),
+      });
+    } catch (error) {
+      request.log.error({ err: error }, "admin user moderation update failed");
+      return reply.code(500).send({
+        message: "Could not update user moderation",
+      });
+    }
   });
 
   server.get("/admin/listings", async (request, reply) => {
     const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
-    const listings = await db.listing.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        city: true,
-        country: true,
-        createdAt: true,
-        host: { select: { email: true, id: true, name: true } },
-        id: true,
-        moderationNote: true,
-        pricePerDay: true,
-        status: true,
-        title: true,
-        _count: {
-          select: {
-            bookings: true,
-            reviews: true,
+    const query = request.query as { limit?: string; page?: string };
+    const { limit, page, skip } = parseAdminPagedQuery(query);
+
+    const [listings, total] = await Promise.all([
+      db.listing.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          city: true,
+          country: true,
+          createdAt: true,
+          host: { select: { email: true, id: true, name: true } },
+          id: true,
+          moderationNote: true,
+          pricePerDay: true,
+          status: true,
+          title: true,
+          _count: {
+            select: {
+              bookings: true,
+              reviews: true,
+            },
           },
         },
-      },
+      }),
+      db.listing.count(),
+    ]);
+
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+    return reply.send({
+      listings,
+      pagination: { limit, page, total, totalPages },
+    });
+  });
+
+  server.get("/admin/host-options", async (request, reply) => {
+    const auth = requireRoles(["admin"])(request, reply);
+    if (!auth) return;
+
+    const users = await db.user.findMany({
+      orderBy: [{ name: "asc" }, { email: "asc" }],
+      take: 500,
+      select: { email: true, id: true, name: true },
     });
 
-    return reply.send({ listings });
+    return reply.send({ users });
   });
 
   server.patch("/admin/listings/:id/status", async (request, reply) => {
@@ -476,56 +579,82 @@ export async function adminRoutes(server: FastifyInstance) {
     const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
-    const bookings = await db.booking.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        checkIn: true,
-        checkOut: true,
-        createdAt: true,
-        guest: { select: { email: true, id: true, name: true } },
-        id: true,
-        listing: {
-          select: {
-            host: { select: { email: true, id: true, name: true } },
-            id: true,
-            title: true,
-          },
-        },
-        payment: {
-          select: {
-            amountTotal: true,
-            currency: true,
-            id: true,
-            status: true,
-          },
-        },
-        status: true,
-        totalPrice: true,
-      },
-    });
+    const query = request.query as { limit?: string; page?: string };
+    const { limit, page, skip } = parseAdminPagedQuery(query);
 
-    return reply.send({ bookings });
+    const [bookings, total] = await Promise.all([
+      db.booking.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          checkIn: true,
+          checkOut: true,
+          createdAt: true,
+          guest: { select: { email: true, id: true, name: true } },
+          id: true,
+          listing: {
+            select: {
+              host: { select: { email: true, id: true, name: true } },
+              id: true,
+              title: true,
+            },
+          },
+          payment: {
+            select: {
+              amountTotal: true,
+              currency: true,
+              id: true,
+              status: true,
+            },
+          },
+          status: true,
+          totalPrice: true,
+        },
+      }),
+      db.booking.count(),
+    ]);
+
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+    return reply.send({
+      bookings,
+      pagination: { limit, page, total, totalPages },
+    });
   });
 
   server.get("/admin/reviews", async (request, reply) => {
     const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
-    const reviews = await db.review.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        author: { select: { email: true, id: true, name: true } },
-        comment: true,
-        createdAt: true,
-        id: true,
-        listing: { select: { id: true, title: true } },
-        moderationNote: true,
-        moderationStatus: true,
-        rating: true,
-      },
-    });
+    const query = request.query as { limit?: string; page?: string };
+    const { limit, page, skip } = parseAdminPagedQuery(query);
 
-    return reply.send({ reviews });
+    const [reviews, total] = await Promise.all([
+      db.review.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          author: { select: { email: true, id: true, name: true } },
+          comment: true,
+          createdAt: true,
+          id: true,
+          listing: { select: { id: true, title: true } },
+          moderationNote: true,
+          moderationStatus: true,
+          rating: true,
+        },
+      }),
+      db.review.count(),
+    ]);
+
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+    return reply.send({
+      reviews,
+      pagination: { limit, page, total, totalPages },
+    });
   });
 
   server.patch("/admin/reviews/:id/moderation", async (request, reply) => {
@@ -571,30 +700,43 @@ export async function adminRoutes(server: FastifyInstance) {
     const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
-    const payments = await db.payment.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        amountTotal: true,
-        booking: {
-          select: {
-            id: true,
-            listing: {
-              select: {
-                id: true,
-                title: true,
+    const query = request.query as { limit?: string; page?: string };
+    const { limit, page, skip } = parseAdminPagedQuery(query);
+
+    const [payments, total] = await Promise.all([
+      db.payment.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          amountTotal: true,
+          booking: {
+            select: {
+              id: true,
+              listing: {
+                select: {
+                  id: true,
+                  title: true,
+                },
               },
             },
           },
+          createdAt: true,
+          currency: true,
+          guest: { select: { email: true, id: true, name: true } },
+          id: true,
+          status: true,
+          stripeCheckoutSessionId: true,
         },
-        createdAt: true,
-        currency: true,
-        guest: { select: { email: true, id: true, name: true } },
-        id: true,
-        status: true,
-        stripeCheckoutSessionId: true,
-      },
-    });
+      }),
+      db.payment.count(),
+    ]);
 
-    return reply.send({ payments });
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+    return reply.send({
+      payments,
+      pagination: { limit, page, total, totalPages },
+    });
   });
 }

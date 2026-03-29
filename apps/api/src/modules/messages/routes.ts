@@ -39,14 +39,14 @@ function formatParticipant(booking: any, userId: string) {
     return {
       id: booking.listing.host.id,
       name: booking.listing.host.name,
-      role: "host",
+      role: "property" as const,
     };
   }
 
   return {
     id: booking.guest.id,
     name: booking.guest.name,
-    role: "guest",
+    role: "guest" as const,
   };
 }
 

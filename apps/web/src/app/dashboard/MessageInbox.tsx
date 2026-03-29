@@ -27,7 +27,7 @@ type Conversation = {
   participant: {
     id: string;
     name: string | null;
-    role: "guest" | "host";
+    role: "guest" | "property";
   };
   unreadCount: number;
 };
@@ -57,7 +57,7 @@ type ThreadData = {
     participant: {
       id: string;
       name: string | null;
-      role: "guest" | "host";
+      role: "guest" | "property";
     };
   };
   messages: ThreadMessage[];
@@ -100,6 +100,10 @@ function authHeaders(token: string) {
     Authorization: `Bearer ${token.trim()}`,
     "Content-Type": "application/json",
   };
+}
+
+function peerRoleLabel(role: "guest" | "property") {
+  return role === "property" ? "Property" : "Guest";
 }
 
 export default function MessageInbox({
@@ -498,7 +502,7 @@ export default function MessageInbox({
                 <div className="message-conversation-top">
                   <strong>{conversation.listing.title}</strong>
                   <span className="dashboard-meta">
-                    {conversation.participant.role}
+                    {peerRoleLabel(conversation.participant.role)}
                   </span>
                 </div>
                 <div className="dashboard-meta">
@@ -529,7 +533,7 @@ export default function MessageInbox({
                     </p>
                     {typingUserId === thread.booking.participant.id && (
                       <p className="message-typing-indicator">
-                        {thread.booking.participant.name ?? "Guest"} is typing...
+                        {thread.booking.participant.name ?? peerRoleLabel(thread.booking.participant.role)} is typing...
                       </p>
                     )}
                   </div>

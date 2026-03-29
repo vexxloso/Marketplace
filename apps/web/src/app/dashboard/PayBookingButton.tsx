@@ -7,9 +7,11 @@ import { API_BASE } from "../../lib/api";
 export default function PayBookingButton({
   bookingId,
   token,
+  layout = "default",
 }: {
   bookingId: string;
   token: string;
+  layout?: "default" | "bookingRow";
 }) {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -55,8 +57,11 @@ export default function PayBookingButton({
     }
   }
 
+  const wrapClass =
+    layout === "bookingRow" ? "payment-action payment-action--booking-row" : "payment-action";
+
   return (
-    <div className="payment-action">
+    <div className={wrapClass}>
       <button
         type="button"
         className="dashboard-primary-btn"

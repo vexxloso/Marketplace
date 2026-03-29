@@ -134,10 +134,7 @@ export default async function ListingDetailPage({
             </div>
           </div>
 
-          <ListingImages
-            initialImages={listing.images ?? []}
-            listingId={listing.id}
-          />
+          <ListingImages initialImages={listing.images ?? []} />
 
           <div className="detail-story-grid">
             <section className="detail-panel">

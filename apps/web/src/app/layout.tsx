@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+
+import { FooterAuthNav, HeaderAuthNav } from "../components/SiteAuthNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,20 +32,10 @@ export default function RootLayout({
               <nav className="nav nav-primary">
                 <Link href="/listings">Explore stays</Link>
                 <Link href="/listings?sort=rating_desc">Top rated</Link>
-                <Link href="/auth?mode=register">Become a host</Link>
+                <Link href="/auth?mode=register">Create account</Link>
               </nav>
 
-              <div className="nav-utility">
-                <Link href="/auth" className="nav-utility-link">
-                  Sign in
-                </Link>
-                <Link href="/dashboard" className="nav-utility-link">
-                  Account
-                </Link>
-                <Link href="/admin" className="nav-cta">
-                  Admin
-                </Link>
-              </div>
+              <HeaderAuthNav />
             </div>
           </header>
 
@@ -57,11 +49,7 @@ export default function RootLayout({
                   Curated properties for guests who want atmosphere, privacy, and memorable stays.
                 </p>
               </div>
-              <div className="site-footer-links">
-                <Link href="/listings">Browse stays</Link>
-                <Link href="/auth">Sign in</Link>
-                <Link href="/dashboard">Dashboard</Link>
-              </div>
+              <FooterAuthNav />
             </div>
           </footer>
         </div>

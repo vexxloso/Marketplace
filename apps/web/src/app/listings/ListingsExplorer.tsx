@@ -45,7 +45,7 @@ type Props = {
   map: MapMeta;
 };
 
-const fallbackImages = ["/listing-interior.jpg", "/hero-villa.jpg", "/auth-lobby.jpg"];
+const fallbackImages = ["/home-visual-1.jpg", "/home-visual-4.jpg", "/home-visual-5.jpg"];
 
 type Cluster = {
   id: string;

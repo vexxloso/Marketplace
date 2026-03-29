@@ -89,17 +89,36 @@ export default function SearchBar({
     <div className="listings-search-page">
       <section className="search-banner">
         <div className="search-banner-overlay">
-          <p className="search-banner-kicker">Find an experience that will make you stand out.</p>
-          <form onSubmit={handleSearch} className="search-banner-form">
-            <input
-              type="text"
-              placeholder="What real estate do you want to rent?"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="search-input search-input-banner"
-            />
-            <button type="submit" className="search-btn search-btn-banner">Search</button>
-          </form>
+          <div className="search-banner-stack">
+            <div className="search-banner-copy">
+              <p className="eyebrow search-banner-eyebrow">Search · Maison Noir</p>
+              <h1 className="search-banner-headline">
+                Find an experience that will make you stand out.
+              </h1>
+              <p className="search-banner-lede">
+                Explore architect-led homes, boutique villas, and city residences with transparent pricing,
+                responsive hosts, and tools to search by place, dates, budget, and what matters to you.
+              </p>
+              <ul className="search-banner-highlights" aria-label="Search benefits">
+                <li>Curated, guest-ready homes</li>
+                <li>List &amp; map discovery</li>
+                <li>Dynamic pricing &amp; availability</li>
+                <li>Reviews you can trust</li>
+              </ul>
+            </div>
+            <form onSubmit={handleSearch} className="search-banner-form">
+              <input
+                type="text"
+                placeholder="What real estate do you want to rent?"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="search-input search-input-banner"
+              />
+              <button type="submit" className="search-btn search-btn-banner">
+                Search
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 

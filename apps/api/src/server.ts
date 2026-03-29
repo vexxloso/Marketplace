@@ -52,6 +52,9 @@ export function buildServer() {
 
   server.register(cors, {
     credentials: true,
+    // Default is only GET,HEAD,POST — without PATCH/PUT/DELETE, browsers block
+    // cross-origin preflight for admin PATCH (moderation, role, listings, etc.).
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { requireRoles, verifyTokenOrReply } from "../../lib/auth";
+import { requireRoles } from "../../lib/auth";
 import { formatDateOnly, parseDateOnly } from "../../lib/pricing";
 import { prisma } from "../../lib/prisma";
 import {
@@ -20,6 +20,9 @@ const db = prisma as {
     update: (args: unknown) => Promise<any>;
     delete: (args: unknown) => Promise<any>;
     count: (args: unknown) => Promise<number>;
+  };
+  user: {
+    findUnique: (args: unknown) => Promise<{ id: string } | null>;
   };
 };
 
@@ -44,6 +47,8 @@ const pricingInputShape = {
   seasonalRates: z.array(seasonalRateInputSchema).default([]),
 } as const;
 
+const hostIdField = z.string().min(1).optional();
+
 const createListingSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().min(10).max(5000),
@@ -53,6 +58,7 @@ const createListingSchema = z.object({
   country: optionalTextField,
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional(),
+  hostId: hostIdField,
   ...pricingInputShape,
 });
 
@@ -75,6 +81,7 @@ const updateListingSchema = z.object({
   weeklyDiscountPercent: z.number().int().min(0).max(100).optional(),
   seasonalRates: z.array(seasonalRateInputSchema).optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  hostId: hostIdField,
 });
 
 const listQuerySchema = z.object({
@@ -589,7 +596,7 @@ export async function listingRoutes(server: FastifyInstance) {
   });
 
   server.post("/listings", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const parsed = createListingSchema.safeParse(request.body);
@@ -611,6 +618,18 @@ export async function listingRoutes(server: FastifyInstance) {
       return reply.code(400).send({ message: locationError });
     }
 
+    let hostId = auth.sub;
+    if (parsed.data.hostId) {
+      const hostUser = await db.user.findUnique({
+        where: { id: parsed.data.hostId },
+        select: { id: true },
+      });
+      if (!hostUser) {
+        return reply.code(400).send({ message: "Host user not found" });
+      }
+      hostId = parsed.data.hostId;
+    }
+
     const listing = await db.listing.create({
       data: {
         title: parsed.data.title,
@@ -629,7 +648,7 @@ export async function listingRoutes(server: FastifyInstance) {
         cancellationPolicy: parsed.data.cancellationPolicy,
         lastMinuteDiscountPercent: parsed.data.lastMinuteDiscountPercent,
         weeklyDiscountPercent: parsed.data.weeklyDiscountPercent,
-        hostId: auth.sub,
+        hostId,
         seasonalRates: {
           create: buildSeasonalRateWrites(parsed.data.seasonalRates),
         },
@@ -670,22 +689,18 @@ export async function listingRoutes(server: FastifyInstance) {
   });
 
   server.put("/listings/:id", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
 
     const existing = await db.listing.findUnique({
       where: { id },
-      select: { hostId: true },
+      select: { id: true },
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Listing not found" });
-    }
-
-    if (existing.hostId !== auth.sub && auth.role !== "admin") {
-      return reply.code(403).send({ message: "Not your listing" });
     }
 
     const parsed = updateListingSchema.safeParse(request.body);
@@ -710,6 +725,17 @@ export async function listingRoutes(server: FastifyInstance) {
     }
 
     const updateData: Record<string, unknown> = { ...parsed.data };
+    if (parsed.data.hostId) {
+      const hostUser = await db.user.findUnique({
+        where: { id: parsed.data.hostId },
+        select: { id: true },
+      });
+      if (!hostUser) {
+        return reply.code(400).send({ message: "Host user not found" });
+      }
+      delete updateData.hostId;
+      updateData.host = { connect: { id: parsed.data.hostId } };
+    }
     if (parsed.data.seasonalRates) {
       updateData.seasonalRates = {
         deleteMany: {},
@@ -757,22 +783,18 @@ export async function listingRoutes(server: FastifyInstance) {
   });
 
   server.delete("/listings/:id", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
 
     const existing = await db.listing.findUnique({
       where: { id },
-      select: { hostId: true },
+      select: { id: true },
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Listing not found" });
-    }
-
-    if (existing.hostId !== auth.sub && auth.role !== "admin") {
-      return reply.code(403).send({ message: "Not your listing" });
     }
 
     await db.listing.delete({ where: { id } });
@@ -781,7 +803,7 @@ export async function listingRoutes(server: FastifyInstance) {
   });
 
   server.get("/my/listings", async (request, reply) => {
-    const auth = verifyTokenOrReply(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const listings = await db.listing.findMany({

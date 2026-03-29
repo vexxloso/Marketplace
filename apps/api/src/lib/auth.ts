@@ -3,23 +3,21 @@ import * as jwt from "jsonwebtoken";
 
 import { env } from "../env";
 
-export type AppRole = "guest" | "host" | "admin";
+export type AppRole = "user" | "admin";
 
 export type AuthPayload = {
   sub: string;
   role: AppRole;
 };
 
-export function toAppRole(role: "GUEST" | "HOST" | "ADMIN"): AppRole {
+export function toAppRole(role: "USER" | "ADMIN"): AppRole {
   if (role === "ADMIN") return "admin";
-  if (role === "HOST") return "host";
-  return "guest";
+  return "user";
 }
 
-export function toDbRole(role: AppRole): "GUEST" | "HOST" | "ADMIN" {
+export function toDbRole(role: AppRole): "USER" | "ADMIN" {
   if (role === "admin") return "ADMIN";
-  if (role === "host") return "HOST";
-  return "GUEST";
+  return "USER";
 }
 
 export function signAccessToken(payload: AuthPayload): string {
@@ -28,7 +26,14 @@ export function signAccessToken(payload: AuthPayload): string {
 
 export function verifyAccessToken(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, env.JWT_SECRET) as AuthPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET) as { sub: string; role?: string };
+    const raw = decoded.role;
+    let role: AppRole;
+    if (raw === "admin") role = "admin";
+    else if (raw === "user") role = "user";
+    else if (raw === "guest" || raw === "host") role = "user";
+    else return null;
+    return { sub: decoded.sub, role };
   } catch {
     return null;
   }

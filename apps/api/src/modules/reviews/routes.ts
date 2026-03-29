@@ -17,10 +17,13 @@ const db = prisma as unknown as {
   booking: {
     findUnique: (args: unknown) => Promise<any>;
   };
+  listing: {
+    findUnique: (args: unknown) => Promise<any>;
+  };
 };
 
 const createReviewSchema = z.object({
-  bookingId: z.string().min(1),
+  listingId: z.string().min(1),
   rating: z.number().int().min(1).max(5),
   comment: z.string().max(2000).optional(),
 });
@@ -62,7 +65,7 @@ export async function reviewRoutes(server: FastifyInstance) {
     });
   });
 
-  // Create a review (authenticated, must have a confirmed booking)
+  // Create a review (authenticated; listing id in body — no booking id required)
   server.post("/reviews", async (request, reply) => {
     const auth = verifyTokenOrReply(request, reply);
     if (!auth) return;
@@ -75,49 +78,36 @@ export async function reviewRoutes(server: FastifyInstance) {
       });
     }
 
-    const { bookingId, rating, comment } = parsed.data;
+    const { listingId, rating, comment } = parsed.data;
 
-    const booking = await db.booking.findUnique({
-      where: { id: bookingId },
+    const listing = await db.listing.findUnique({
+      where: { id: listingId },
       select: {
         id: true,
-        guestId: true,
-        listingId: true,
+        title: true,
+        hostId: true,
         status: true,
-        checkOut: true,
-        listing: {
-          select: {
-            title: true,
-            hostId: true,
-          },
-        },
       },
     });
 
-    if (!booking) {
-      return reply.code(404).send({ message: "Booking not found" });
+    if (!listing) {
+      return reply.code(404).send({ message: "Listing not found" });
     }
 
-    if (booking.guestId !== auth.sub) {
-      return reply.code(403).send({ message: "You can only review your own bookings" });
+    if (listing.status !== "PUBLISHED") {
+      return reply.code(400).send({ message: "Reviews are only allowed on published listings" });
     }
 
-    if (booking.status !== "CONFIRMED") {
-      return reply.code(400).send({ message: "Can only review confirmed bookings" });
-    }
-
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    if (new Date(booking.checkOut) > now) {
-      return reply.code(400).send({ message: "Can only review after check-out date" });
+    if (listing.hostId === auth.sub) {
+      return reply.code(403).send({ message: "You cannot review your own listing" });
     }
 
     const existing = await db.review.findFirst({
-      where: { bookingId },
+      where: { authorId: auth.sub, listingId },
     });
 
     if (existing) {
-      return reply.code(409).send({ message: "You already reviewed this booking" });
+      return reply.code(409).send({ message: "You already reviewed this listing" });
     }
 
     const review = await db.review.create({
@@ -125,8 +115,8 @@ export async function reviewRoutes(server: FastifyInstance) {
         rating,
         comment: comment ?? null,
         authorId: auth.sub,
-        listingId: booking.listingId,
-        bookingId,
+        listingId,
+        bookingId: null,
       },
       select: {
         id: true,
@@ -138,11 +128,11 @@ export async function reviewRoutes(server: FastifyInstance) {
     });
 
     await createNotification({
-      body: `You received a ${rating}-star review for ${booking.listing.title}.`,
-      link: `/listings/${booking.listingId}`,
+      body: `You received a ${rating}-star review for ${listing.title}.`,
+      link: `/listings/${listingId}`,
       title: "New review received",
       type: "REVIEW_RECEIVED",
-      userId: booking.listing.hostId,
+      userId: listing.hostId,
     });
 
     return reply.code(201).send({ review });

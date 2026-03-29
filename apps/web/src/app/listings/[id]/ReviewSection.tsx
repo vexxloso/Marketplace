@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { API_BASE } from "../../../lib/api";
@@ -30,26 +30,24 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
+const loginReturnUrl = (listingId: string) =>
+  `/auth?mode=login&returnUrl=${encodeURIComponent(`/listings/${listingId}`)}`;
+
 export default function ReviewSection({ listingId }: Props) {
+  const router = useRouter();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const [bookingId, setBookingId] = useState("");
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [token, setToken] = useState("");
   const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [submitMsg, setSubmitMsg] = useState("");
 
   useEffect(() => {
     fetchReviews();
   }, [listingId]);
-
-  useEffect(() => {
-    setToken(getStoredToken());
-  }, []);
 
   async function fetchReviews() {
     setLoading(true);
@@ -68,9 +66,10 @@ export default function ReviewSection({ listingId }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token.trim()) {
-      setSubmitMsg("Paste your JWT token");
-      setSubmitStatus("error");
+    const sessionToken = getStoredToken().trim();
+    if (!sessionToken) {
+      const returnUrl = `/listings/${listingId}`;
+      router.push(`/auth?mode=login&returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -82,9 +81,9 @@ export default function ReviewSection({ listingId }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token.trim()}`,
+          Authorization: `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ bookingId, rating, comment: comment || undefined }),
+        body: JSON.stringify({ listingId, rating, comment: comment || undefined }),
       });
 
       const data = await res.json();
@@ -97,7 +96,6 @@ export default function ReviewSection({ listingId }: Props) {
 
       setSubmitStatus("success");
       setSubmitMsg("Review submitted!");
-      setBookingId("");
       setComment("");
       setRating(5);
       fetchReviews();
@@ -143,20 +141,19 @@ export default function ReviewSection({ listingId }: Props) {
         </div>
       )}
 
-      <details className="review-form-toggle">
+      <details
+        className="review-form-toggle"
+        onToggle={(e) => {
+          const el = e.currentTarget;
+          if (!el.open) return;
+          if (!getStoredToken().trim()) {
+            el.open = false;
+            router.push(loginReturnUrl(listingId));
+          }
+        }}
+      >
         <summary>Write a review</summary>
         <form onSubmit={handleSubmit} className="review-form">
-          <label className="booking-field">
-            <span>Booking ID</span>
-            <input
-              type="text"
-              placeholder="Your confirmed booking ID"
-              value={bookingId}
-              onChange={(e) => setBookingId(e.target.value)}
-              required
-            />
-          </label>
-
           <label className="booking-field">
             <span>Rating</span>
             <div className="rating-picker">
@@ -185,26 +182,14 @@ export default function ReviewSection({ listingId }: Props) {
           </label>
 
           <p className="dashboard-meta" style={{ marginTop: 8 }}>
-            Sign in first if you need account access. <Link href="/auth">Open account access</Link>.
+            Sign in is required to submit a review. Opening this form sends you to sign in if you are
+            not logged in.
           </p>
-
-          <details className="booking-token-toggle">
-            <summary>Manual token override</summary>
-            <label className="booking-field" style={{ marginTop: 12 }}>
-              <span>JWT Token</span>
-              <input
-                type="text"
-                placeholder="Saved automatically from /auth"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
-            </label>
-          </details>
 
           <button
             type="submit"
             className="book-btn"
-            disabled={!bookingId || submitStatus === "loading"}
+            disabled={submitStatus === "loading"}
           >
             {submitStatus === "loading" ? "Submitting..." : "Submit Review"}
           </button>

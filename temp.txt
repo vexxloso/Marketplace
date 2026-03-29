@@ -8,3 +8,12 @@ psql -U postgres
 
 pnpm --filter @market/api prisma:generate
 pnpm admin:promote
+
+i will clearly user role
+there is only need user and admin
+so now there is no don't need host
+and user can't update list
+admin can CRUD for list
+and once login and don't display login page
+and user when click book if this use isn't login have to redirect to login page
+first say your plan

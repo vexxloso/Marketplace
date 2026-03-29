@@ -339,7 +339,7 @@ export async function bookingRoutes(server: FastifyInstance) {
 
   // List bookings for my listings (as host)
   server.get("/my/listings/bookings", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const bookings = await db.booking.findMany({
@@ -365,7 +365,7 @@ export async function bookingRoutes(server: FastifyInstance) {
 
   // Confirm a booking (host only)
   server.patch("/bookings/:id/confirm", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
@@ -381,9 +381,6 @@ export async function bookingRoutes(server: FastifyInstance) {
 
     if (!booking) {
       return reply.code(404).send({ message: "Booking not found" });
-    }
-    if (booking.listing.hostId !== auth.sub && auth.role !== "admin") {
-      return reply.code(403).send({ message: "Not your listing" });
     }
     if (booking.status !== "PENDING") {
       return reply.code(400).send({ message: `Cannot confirm a ${booking.status} booking` });
@@ -427,10 +424,9 @@ export async function bookingRoutes(server: FastifyInstance) {
     }
 
     const isGuest = booking.guestId === auth.sub;
-    const isHost = booking.listing.hostId === auth.sub;
     const isAdmin = auth.role === "admin";
 
-    if (!isGuest && !isHost && !isAdmin) {
+    if (!isGuest && !isAdmin) {
       return reply.code(403).send({ message: "Not authorized" });
     }
 

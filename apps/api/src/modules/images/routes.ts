@@ -78,21 +78,17 @@ export async function imageRoutes(server: FastifyInstance) {
   });
 
   server.post("/listings/:id/images", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
     const listing = await db.listing.findUnique({
       where: { id },
-      select: { hostId: true, id: true },
+      select: { id: true },
     });
 
     if (!listing) {
       return reply.code(404).send({ message: "Listing not found" });
-    }
-
-    if (listing.hostId !== auth.sub && auth.role !== "admin") {
-      return reply.code(403).send({ message: "Not your listing" });
     }
 
     const file = await request.file();
@@ -138,7 +134,7 @@ export async function imageRoutes(server: FastifyInstance) {
   });
 
   server.delete("/listing-images/:imageId", async (request, reply) => {
-    const auth = requireRoles(["host", "admin"])(request, reply);
+    const auth = requireRoles(["admin"])(request, reply);
     if (!auth) return;
 
     const { imageId } = request.params as { imageId: string };
@@ -148,17 +144,13 @@ export async function imageRoutes(server: FastifyInstance) {
       select: {
         fileName: true,
         id: true,
-        listing: { select: { hostId: true, id: true } },
+        listing: { select: { id: true } },
         originalName: true,
       },
     });
 
     if (!image) {
       return reply.code(404).send({ message: "Image not found" });
-    }
-
-    if (image.listing.hostId !== auth.sub && auth.role !== "admin") {
-      return reply.code(403).send({ message: "Not your listing" });
     }
 
     await db.listingImage.delete({

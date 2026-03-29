@@ -2,24 +2,25 @@ import * as bcrypt from "bcryptjs";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import {
-  signAccessToken,
-  toAppRole,
-  toDbRole,
-  verifyTokenOrReply,
-  requireRoles,
-} from "../../lib/auth";
+import { signAccessToken, toAppRole, verifyTokenOrReply, requireRoles } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 
 const registerBodySchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(1).email(),
   password: z.string().min(8),
-  name: z.string().min(1).optional(),
-  role: z.enum(["guest", "host"]).optional(),
+  name: z
+    .string()
+    .max(200)
+    .nullish()
+    .transform((value) => {
+      if (value == null) return undefined;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    }),
 });
 
 const loginBodySchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(1).email(),
   password: z.string().min(8),
 });
 
@@ -57,7 +58,7 @@ export async function authRoutes(server: FastifyInstance) {
         email: data.email,
         name: data.name,
         passwordHash,
-        role: toDbRole(data.role ?? "guest"),
+        role: "USER",
       },
       select: { id: true, email: true, name: true, role: true },
     });

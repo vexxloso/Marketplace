@@ -15,6 +15,15 @@ type NotificationItem = {
   type: string;
 };
 
+function notificationTypeLabel(type: string) {
+  const t = type.trim();
+  if (!t) return "";
+  return t
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function NotificationPanel({
   enabled,
   token,
@@ -125,17 +134,27 @@ export default function NotificationPanel({
         <div className="empty">No notifications yet.</div>
       ) : (
         <div className="notifications-list">
-          {notifications.map((item) => (
+          {notifications.map((item) => {
+            const typeTag = notificationTypeLabel(item.type);
+            return (
             <div
               key={item.id}
-              className={item.isRead ? "notification-card" : "notification-card unread"}
+              className={
+                item.isRead ? "dashboard-notify-row" : "dashboard-notify-row dashboard-notify-row--unread"
+              }
             >
-              <div className="notification-top">
-                <div>
-                  <strong>{item.title}</strong>
-                  <p className="dashboard-meta">
+              <div className="dashboard-notify-row-top">
+                <div className="dashboard-notify-headline">
+                  <strong className="dashboard-notify-title">{item.title}</strong>
+                  {typeTag ? (
+                    <span className="dashboard-notify-tag">{typeTag}</span>
+                  ) : null}
+                  <time
+                    className="dashboard-notify-date"
+                    dateTime={item.createdAt}
+                  >
                     {new Date(item.createdAt).toLocaleString()}
-                  </p>
+                  </time>
                 </div>
                 {!item.isRead ? (
                   <button
@@ -147,10 +166,15 @@ export default function NotificationPanel({
                   </button>
                 ) : null}
               </div>
-              <p className="dashboard-comment">{item.body}</p>
-              {item.link ? <Link href={item.link}>Open</Link> : null}
+              <p className="dashboard-comment dashboard-notify-body">{item.body}</p>
+              {item.link ? (
+                <Link href={item.link} className="dashboard-notify-link">
+                  Open
+                </Link>
+              ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
