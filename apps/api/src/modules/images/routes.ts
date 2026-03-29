@@ -4,9 +4,9 @@ import path from "node:path";
 
 import type { FastifyInstance } from "fastify";
 
-import { requireRoles } from "../../lib/auth";
-import { buildListingImageUrl, listingUploadsDir } from "../../lib/uploads";
-import { prisma } from "../../lib/prisma";
+import { requireRoles } from "../../lib/auth.js";
+import { buildListingImageUrl, listingUploadsDir } from "../../lib/uploads.js";
+import { prisma } from "../../lib/prisma.js";
 
 const allowedMimeTypes = new Set([
   "image/jpeg",

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 
-import { env } from "../env";
+import { env } from "../env.js";
 
 let stripeClient: Stripe | null | undefined;
 

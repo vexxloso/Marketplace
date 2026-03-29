@@ -5,17 +5,17 @@ import websocket from "@fastify/websocket";
 import fastifyRawBody from "fastify-raw-body";
 import Fastify from "fastify";
 
-import { env } from "./env";
-import { adminRoutes } from "./modules/admin/routes";
-import { authRoutes } from "./modules/auth/routes";
-import { bookingRoutes } from "./modules/bookings/routes";
-import { imageRoutes } from "./modules/images/routes";
-import { listingRoutes } from "./modules/listings/routes";
-import { messageRoutes } from "./modules/messages/routes";
-import { notificationRoutes } from "./modules/notifications/routes";
-import { paymentRoutes } from "./modules/payments/routes";
-import { reviewRoutes } from "./modules/reviews/routes";
-import { ensureUploadDirs, uploadsRootDir } from "./lib/uploads";
+import { env } from "./env.js";
+import { adminRoutes } from "./modules/admin/routes.js";
+import { authRoutes } from "./modules/auth/routes.js";
+import { bookingRoutes } from "./modules/bookings/routes.js";
+import { imageRoutes } from "./modules/images/routes.js";
+import { listingRoutes } from "./modules/listings/routes.js";
+import { messageRoutes } from "./modules/messages/routes.js";
+import { notificationRoutes } from "./modules/notifications/routes.js";
+import { paymentRoutes } from "./modules/payments/routes.js";
+import { reviewRoutes } from "./modules/reviews/routes.js";
+import { ensureUploadDirs, uploadsRootDir } from "./lib/uploads.js";
 
 export function buildServer() {
   // #region agent log

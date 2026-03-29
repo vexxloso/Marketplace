@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { requireRoles, toAppRole, toDbRole } from "../../lib/auth";
-import { prisma } from "../../lib/prisma";
+import { requireRoles, toAppRole, toDbRole } from "../../lib/auth.js";
+import { prisma } from "../../lib/prisma.js";
 
 const updateUserRoleSchema = z.object({
   role: z.enum(["user", "admin"]),

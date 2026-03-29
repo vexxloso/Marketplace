@@ -1,5 +1,5 @@
-import { env } from "./env";
-import { buildServer } from "./server";
+import { env } from "./env.js";
+import { buildServer } from "./server.js";
 
 const marketBootState = (globalThis as typeof globalThis & {
   __marketBootCount?: number;

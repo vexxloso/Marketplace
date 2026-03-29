@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { verifyAccessToken, verifyTokenOrReply } from "../../lib/auth";
-import { createNotification } from "../../lib/notifications";
-import { prisma } from "../../lib/prisma";
-import { messagingRealtimeHub } from "../../lib/realtime";
+import { verifyAccessToken, verifyTokenOrReply } from "../../lib/auth.js";
+import { createNotification } from "../../lib/notifications.js";
+import { prisma } from "../../lib/prisma.js";
+import { messagingRealtimeHub } from "../../lib/realtime.js";
 
 const db = prisma as unknown as {
   booking: {

@@ -2,8 +2,8 @@ import * as bcrypt from "bcryptjs";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { signAccessToken, toAppRole, verifyTokenOrReply, requireRoles } from "../../lib/auth";
-import { prisma } from "../../lib/prisma";
+import { signAccessToken, toAppRole, verifyTokenOrReply, requireRoles } from "../../lib/auth.js";
+import { prisma } from "../../lib/prisma.js";
 
 const registerBodySchema = z.object({
   email: z.string().trim().min(1).email(),

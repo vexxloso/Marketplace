@@ -2,10 +2,10 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import Stripe from "stripe";
 import { z } from "zod";
 
-import { env } from "../../env";
-import { verifyTokenOrReply } from "../../lib/auth";
-import { getStripeClient } from "../../lib/stripe";
-import { prisma } from "../../lib/prisma";
+import { env } from "../../env.js";
+import { verifyTokenOrReply } from "../../lib/auth.js";
+import { getStripeClient } from "../../lib/stripe.js";
+import { prisma } from "../../lib/prisma.js";
 
 const createCheckoutSchema = z.object({
   bookingId: z.string().min(1),

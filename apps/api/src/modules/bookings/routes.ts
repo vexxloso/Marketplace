@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { requireRoles, verifyTokenOrReply } from "../../lib/auth";
-import { createNotification } from "../../lib/notifications";
-import { calculateBookingQuote, daysBetween, parseDateOnly } from "../../lib/pricing";
-import { prisma } from "../../lib/prisma";
+import { requireRoles, verifyTokenOrReply } from "../../lib/auth.js";
+import { createNotification } from "../../lib/notifications.js";
+import { calculateBookingQuote, daysBetween, parseDateOnly } from "../../lib/pricing.js";
+import { prisma } from "../../lib/prisma.js";
 
 const db = prisma as unknown as {
   booking: {

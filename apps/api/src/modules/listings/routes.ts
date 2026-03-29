@@ -1,16 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { requireRoles } from "../../lib/auth";
-import { formatDateOnly, parseDateOnly } from "../../lib/pricing";
-import { prisma } from "../../lib/prisma";
+import { requireRoles } from "../../lib/auth.js";
+import { formatDateOnly, parseDateOnly } from "../../lib/pricing.js";
+import { prisma } from "../../lib/prisma.js";
 import {
   buildDisplayLocation,
   calculateCoordinateBounds,
   calculateRelevanceScore,
   haversineDistanceKm,
-} from "../../lib/search";
-import { buildListingImageUrl } from "../../lib/uploads";
+} from "../../lib/search.js";
+import { buildListingImageUrl } from "../../lib/uploads.js";
 
 const db = prisma as {
   listing: {

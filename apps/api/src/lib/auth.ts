@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import * as jwt from "jsonwebtoken";
 
-import { env } from "../env";
+import { env } from "../env.js";
 
 export type AppRole = "user" | "admin";
 

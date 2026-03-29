@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { verifyTokenOrReply } from "../../lib/auth";
-import { createNotification } from "../../lib/notifications";
-import { prisma } from "../../lib/prisma";
+import { verifyTokenOrReply } from "../../lib/auth.js";
+import { createNotification } from "../../lib/notifications.js";
+import { prisma } from "../../lib/prisma.js";
 
 const db = prisma as unknown as {
   review: {

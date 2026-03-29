@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
-import { verifyTokenOrReply } from "../../lib/auth";
-import { prisma } from "../../lib/prisma";
+import { verifyTokenOrReply } from "../../lib/auth.js";
+import { prisma } from "../../lib/prisma.js";
 
 const db = prisma as unknown as {
   notification: {
