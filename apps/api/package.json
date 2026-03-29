@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
@@ -10,6 +13,7 @@
     "admin:reset-password": "tsx scripts/reset-password.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
     "lint": "echo \"lint pending framework setup\"",
     "test": "echo \"test pending framework setup\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
