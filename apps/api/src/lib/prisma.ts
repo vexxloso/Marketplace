@@ -1,8 +1,8 @@
-const { PrismaClient } = require("@prisma/client") as { PrismaClient: new (...args: unknown[]) => unknown };
+import { PrismaClient } from "@prisma/client";
 
 declare global {
   // eslint-disable-next-line no-var
-  var prisma: unknown | undefined;
+  var prisma: PrismaClient | undefined;
 }
 
 export const prisma =
