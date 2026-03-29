@@ -3534,28 +3534,30 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - var(--site-header-height) - var(--hero-viewport-trim));
-  min-height: calc(100dvh - var(--site-header-height) - var(--hero-viewport-trim));
+  /* Full viewport under fixed header — image fills this area */
+  min-height: calc(100vh - var(--site-header-height));
+  min-height: calc(100dvh - var(--site-header-height));
+  min-height: calc(100svh - var(--site-header-height));
   border-bottom: 1px solid rgba(214, 180, 122, 0.12);
   background: #0d1411;
 }
 
-.home-v2-hero::before {
-  content: "";
+.home-v2-hero-bg {
   position: absolute;
-  inset: -14px;
+  inset: 0;
   z-index: 0;
-  background: url("/home-hero-bg.jpg") center/cover no-repeat;
-  animation: homeHeroKenBurns 22s ease-in-out infinite alternate;
+  overflow: hidden;
 }
 
-.home-v2-hero.home-v2-hero--editorial::after {
-  content: "";
+.home-v2-hero-bg-img {
   position: absolute;
-  inset: -14px;
-  z-index: 1;
-  pointer-events: none;
-  background: rgba(28, 82, 62, 0.5);
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  animation: homeHeroKenBurns 22s ease-in-out infinite alternate;
 }
 
 .home-v2-hero-overlay {
@@ -3699,15 +3701,20 @@ h1 {
   position: relative;
   z-index: 2;
   margin-top: -56px;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 880px;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(20px, 4vw, 40px);
+  gap: clamp(12px, 2.5vw, 22px);
   padding: 0 4px;
+  box-sizing: border-box;
 }
 
 .home-v2-ethos-item {
-  padding: clamp(22px, 4vw, 28px) clamp(22px, 3vw, 28px);
-  border-radius: 20px;
+  padding: clamp(14px, 2.5vw, 20px) clamp(14px, 2vw, 18px);
+  border-radius: 16px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
@@ -3736,21 +3743,22 @@ h1 {
 }
 
 .home-v2-ethos.home-v2-ethos--light {
-  margin-top: -84px;
+  margin-top: -64px;
+  max-width: 840px;
 }
 
 .home-v2-ethos--light .home-v2-ethos-item {
   text-align: center;
   background: #fafafa;
   border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .home-v2-ethos--light .home-v2-ethos-item h3 {
-  margin: 0 0 12px;
-  font-size: 1.06rem;
+  margin: 0 0 8px;
+  font-size: 0.92rem;
   font-weight: 800;
   letter-spacing: -0.015em;
   text-transform: none;
@@ -3759,14 +3767,14 @@ h1 {
 
 .home-v2-ethos--light .home-v2-ethos-item p {
   color: #5c5666;
-  font-size: 0.95rem;
-  line-height: 1.7;
+  font-size: 0.82rem;
+  line-height: 1.58;
 }
 
 .home-v2-ethos-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 18px;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
   color: #6b4fc6;
 }
 
@@ -4624,7 +4632,10 @@ h1 {
   position: absolute;
   inset: -12px;
   z-index: 0;
-  background: url("/home-search-banner.jpg") center/cover no-repeat;
+  background-image: var(--search-banner-bg);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   animation: homeHeroKenBurns 28s ease-in-out infinite alternate-reverse;
 }
 
@@ -5558,15 +5569,16 @@ h1 {
   .home-v2-ethos {
     grid-template-columns: 1fr;
     margin-top: -40px;
-    gap: 16px;
+    gap: 12px;
+    max-width: min(440px, 100%);
   }
 
   .home-v2-ethos.home-v2-ethos--light {
-    margin-top: -48px;
+    margin-top: -40px;
   }
 
   .home-v2-ethos-item {
-    padding: clamp(20px, 5vw, 24px);
+    padding: clamp(14px, 4vw, 18px);
   }
 
   .home-v2-hero-search-pill {
@@ -5700,8 +5712,9 @@ h1 {
   }
 
   .home-v2-hero {
-    min-height: calc(100vh - var(--site-header-height-mobile) - var(--hero-viewport-trim));
-    min-height: calc(100svh - var(--site-header-height-mobile) - var(--hero-viewport-trim));
+    min-height: calc(100vh - var(--site-header-height-mobile));
+    min-height: calc(100dvh - var(--site-header-height-mobile));
+    min-height: calc(100svh - var(--site-header-height-mobile));
   }
 
   .home-v2-hero-overlay {
@@ -5794,7 +5807,7 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-v2-hero::before,
+  .home-v2-hero .home-v2-hero-bg-img,
   .search-banner::before {
     animation: none;
     transform: none;

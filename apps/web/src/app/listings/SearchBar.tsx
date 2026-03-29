@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { publicUrl } from "../../lib/base-path";
+
 export default function SearchBar({
   totalCount,
   children,
@@ -87,7 +89,12 @@ export default function SearchBar({
 
   return (
     <div className="listings-search-page">
-      <section className="search-banner">
+      <section
+        className="search-banner"
+        style={{
+          ["--search-banner-bg" as string]: `url("${publicUrl("/home-search-banner.jpg")}")`,
+        }}
+      >
         <div className="search-banner-overlay">
           <div className="search-banner-stack">
             <div className="search-banner-copy">

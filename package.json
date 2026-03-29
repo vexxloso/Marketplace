@@ -6,6 +6,7 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "admin:promote": "pnpm --filter @market/api admin:promote",
+    "admin:reset-password": "pnpm --filter @market/api admin:reset-password",
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",

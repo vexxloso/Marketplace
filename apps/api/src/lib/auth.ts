@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import * as jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 import { env } from "../env.js";
 

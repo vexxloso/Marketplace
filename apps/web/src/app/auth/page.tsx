@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { API_BASE } from "../../lib/api";
+import { publicUrl } from "../../lib/base-path";
 import { clearStoredTokens, getStoredToken, storeToken } from "../../lib/auth";
 
 function safeReturnPath(raw: string | null): string | null {
@@ -143,7 +144,7 @@ function AuthPageContent() {
 
           <div className="auth-editorial-visual">
             <img
-              src="/home-visual-3.jpg"
+              src={publicUrl("/home-visual-3.jpg")}
               alt="Luxury hotel lobby"
               className="auth-editorial-image"
             />

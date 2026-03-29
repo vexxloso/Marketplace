@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { publicUrl } from "../lib/base-path";
 import HomeV2Slider from "./HomeV2Slider";
 import Reveal from "./Reveal";
 import { EthosIconManagement, EthosIconTrust, EthosIconVisibility } from "./HomeEthosIcons";
@@ -24,33 +26,33 @@ const guestFavorites = [
     title: "The Gothic Room at Chateau Trebesice",
     provider: "Landmark Living Realty",
     price: "198",
-    image: "/home-visual-1.jpg",
+    image: publicUrl("/home-visual-1.jpg"),
   },
   {
     title: "Private Castle Only for You",
     provider: "Landmark Living Realty",
     price: "2000",
-    image: "/home-visual-2.jpg",
+    image: publicUrl("/home-visual-2.jpg"),
   },
   {
     title: "MIKO II. Micro Cabin for Two",
     provider: "PrimeNest Properties",
     price: "120",
-    image: "/home-visual-3.jpg",
+    image: publicUrl("/home-visual-3.jpg"),
   },
   {
     title: "King's Rock Cabin 1",
     provider: "PrimeNest Properties",
     price: "150",
-    image: "/home-visual-4.jpg",
+    image: publicUrl("/home-visual-4.jpg"),
   },
 ];
 
 const categories = [
-  { title: "Historical homes", image: "/home-visual-5.jpg" },
-  { title: "Beachfront", image: "/home-visual-6.jpg" },
-  { title: "Amazing views", image: "/home-visual-1.jpg" },
-  { title: "Lake", image: "/home-visual-2.jpg" },
+  { title: "Historical homes", image: publicUrl("/home-visual-5.jpg") },
+  { title: "Beachfront", image: publicUrl("/home-visual-6.jpg") },
+  { title: "Amazing views", image: publicUrl("/home-visual-1.jpg") },
+  { title: "Lake", image: publicUrl("/home-visual-2.jpg") },
 ];
 
 const newestPlaces = [
@@ -58,37 +60,37 @@ const newestPlaces = [
     title: "Room in Toulon",
     provider: "Horizon Realty Group",
     price: "50",
-    image: "/home-visual-2.jpg",
+    image: publicUrl("/home-visual-2.jpg"),
   },
   {
     title: "Carrickreagh Houseboat",
     provider: "Horizon Realty Group",
     price: "254",
-    image: "/home-visual-5.jpg",
+    image: publicUrl("/home-visual-5.jpg"),
   },
   {
     title: "MIKO II. Micro Cabin for Two",
     provider: "PrimeNest Properties",
     price: "120",
-    image: "/home-visual-3.jpg",
+    image: publicUrl("/home-visual-3.jpg"),
   },
   {
     title: "King's Rock Cabin 1",
     provider: "PrimeNest Properties",
     price: "150",
-    image: "/home-visual-4.jpg",
+    image: publicUrl("/home-visual-4.jpg"),
   },
   {
     title: "The Gothic Room at Chateau Trebesice",
     provider: "Landmark Living Realty",
     price: "198",
-    image: "/home-visual-6.jpg",
+    image: publicUrl("/home-visual-6.jpg"),
   },
   {
     title: "Private Pool Villa Retreat",
     provider: "BlueSky Estates",
     price: "320",
-    image: "/home-visual-1.jpg",
+    image: publicUrl("/home-visual-1.jpg"),
   },
 ];
 
@@ -117,6 +119,15 @@ export default function HomePage() {
   return (
     <main className="home-v2">
       <section className="home-v2-hero home-v2-hero--editorial">
+        <div className="home-v2-hero-bg" aria-hidden>
+          <img
+            src={publicUrl("/home-hero-bg.jpg")}
+            alt=""
+            className="home-v2-hero-bg-img"
+            decoding="async"
+            fetchPriority="high"
+          />
+        </div>
         <div className="home-v2-hero-overlay">
           <div className="home-v2-hero-copy home-v2-hero-copy--editorial">
             <h1 className="home-v2-hero-brandline home-v2-hero-fade">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { apiAssetUrl } from "../../lib/api";
+import { publicUrl } from "../../lib/base-path";
 
 type Listing = {
   id: string;
@@ -45,7 +46,11 @@ type Props = {
   map: MapMeta;
 };
 
-const fallbackImages = ["/home-visual-1.jpg", "/home-visual-4.jpg", "/home-visual-5.jpg"];
+const fallbackImages = [
+  publicUrl("/home-visual-1.jpg"),
+  publicUrl("/home-visual-4.jpg"),
+  publicUrl("/home-visual-5.jpg"),
+];
 
 type Cluster = {
   id: string;
